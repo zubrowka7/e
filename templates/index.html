@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Моніторинг споживання електроенергії</title>
+
+<style>
+body{margin:0;background:#121212;font-family:system-ui,sans-serif;padding:20px;color:#fff;}
+.header{font-size:18px;font-weight:600;text-align:center;margin-bottom:20px;color:#eee;}
+.dashboard{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:1100px;margin:auto;}
+.card{background:#1e1e1e;border-radius:14px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,.4);height:180px;position:relative;}
+.title{font-size:13px;color:#aaa;}
+.value-row{display:flex;align-items:baseline;gap:6px;margin-top:6px;}
+.value{font-size:32px;font-weight:600;line-height:1;}
+.unit{font-size:14px;color:#aaa;}
+.chart{position:absolute;left:0;right:0;bottom:6px;}
+@media screen and (max-width:768px){.dashboard{grid-template-columns:repeat(2,1fr);}}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+</head>
+<body>
+
+<div class="header">Моніторинг споживання електроенергії</div>
+<div class="dashboard" id="dashboard"></div>
+
+<script>
+const cardsData = [
+  {title:"Напруга", unit:"В", color:"#4fc3f7", data:[]},
+  {title:"Струм", unit:"А", color:"#ff7043", data:[]},
+  {title:"Потужність", unit:"Вт", color:"#ab47bc", data:[]},
+  {title:"Енергія", unit:"кВт·год", color:"#66bb6a", data:[]},
+  {title:"Частота", unit:"Гц", color:"#ffee58", data:[]},
+  {title:"Коефіцієнт потужності", unit:"", color:"#26c6da", data:[]}
+];
+
+let categories = [];
+const maxPoints = 20;
+const container = document.getElementById("dashboard");
+const charts = [];
+
+cardsData.forEach((c,i)=>{
+  const card = document.createElement("div");
+  card.className="card";
+  card.innerHTML=`
+    <div class="title">${c.title}</div>
+    <div class="value-row">
+      <div class="value" style="color:${c.color}" id="value${i}">0</div>
+      <div class="unit">${c.unit}</div>
+    </div>
+    <div class="chart" id="chart${i}"></div>
+  `;
+  container.appendChild(card);
+
+  const chart = new ApexCharts(document.querySelector(`#chart${i}`),{
+    chart:{type:"area",height:90,sparkline:{enabled:true},background:"transparent"},
+    series:[{data:[]}],
+    colors:[c.color],
+    stroke:{curve:"smooth", width:2},
+    fill:{type:"gradient",gradient:{shade:"dark",opacityFrom:0.45,opacityTo:0.05}},
+    xaxis:{categories:[]},
+    tooltip:{enabled:true, theme:"dark", x:{show:false}}
+  });
+  chart.render();
+  charts.push(chart);
+});
+
+async function updateData(){
+  const r = await fetch("/api/latest");
+  const d = await r.json();
+  const time = new Date().toLocaleTimeString();
+
+  categories.push(time);
+  if(categories.length > maxPoints) categories.shift();
+
+  const values = [d.voltage,d.current,d.power,d.energy,d.frequency,d.pf];
+
+  values.forEach((v,i)=>{
+    cardsData[i].data.push(v);
+    if(cardsData[i].data.length > maxPoints) cardsData[i].data.shift();
+    document.getElementById(`value${i}`).textContent = v;
+    charts[i].updateOptions({xaxis:{categories}});
+    charts[i].updateSeries([{data:cardsData[i].data}]);
+  });
+}
+
+setInterval(updateData,15000);
+updateData();
+</script>
+
+</body>
+</html>
