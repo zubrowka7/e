@@ -8,10 +8,10 @@
 <style>
 body{
   margin:0;
-  background:#121212;
-  font-family:system-ui, sans-serif;
   padding:20px;
+  background:#121212;
   color:#fff;
+  font-family:system-ui,sans-serif;
 }
 .header{
   font-size:18px;
@@ -22,18 +22,18 @@ body{
 }
 .dashboard{
   display:grid;
-  grid-template-columns:repeat(3, 1fr);
+  grid-template-columns:repeat(3,1fr);
   gap:16px;
   max-width:1100px;
   margin:auto;
 }
 .card{
+  position:relative;
+  height:180px;
+  padding:14px 16px;
   background:#1e1e1e;
   border-radius:14px;
-  padding:14px 16px;
   box-shadow:0 8px 24px rgba(0,0,0,.4);
-  height:180px;
-  position:relative;
 }
 .title{font-size:13px;color:#aaa;}
 .value-row{display:flex;align-items:baseline;gap:6px;margin-top:6px;}
@@ -41,10 +41,8 @@ body{
 .unit{font-size:14px;color:#aaa;}
 .chart{position:absolute;left:0;right:0;bottom:6px;}
 
-@media screen and (max-width:768px){
-  .dashboard{
-    grid-template-columns:repeat(2, 1fr);
-  }
+@media(max-width:768px){
+  .dashboard{grid-template-columns:repeat(2,1fr);}
 }
 </style>
 
@@ -57,58 +55,52 @@ body{
 
 <script>
 const cardsData = [
-  {key:"voltage", title:"Напруга", unit:"В", color:"#4fc3f7"},
-  {key:"current", title:"Струм", unit:"А", color:"#ff7043"},
-  {key:"power", title:"Потужність", unit:"Вт", color:"#ab47bc"},
-  {key:"energy", title:"Енергія", unit:"кВт·год", color:"#66bb6a"},
-  {key:"frequency", title:"Частота", unit:"Гц", color:"#ffee58"},
-  {key:"pf", title:"Коефіцієнт потужності", unit:"", color:"#26c6da"}
+  {key:"voltage",title:"Напруга",unit:"В",color:"#4fc3f7",min:0,max:250},
+  {key:"current",title:"Струм",unit:"А",color:"#ff7043",min:0,max:50},
+  {key:"power",title:"Потужність",unit:"Вт",color:"#ab47bc",min:0,max:10000},
+  {key:"energy",title:"Енергія",unit:"кВт·год",color:"#66bb6a",min:0,max:5000},
+  {key:"frequency",title:"Частота",unit:"Гц",color:"#ffee58",min:45,max:55},
+  {key:"pf",title:"Коефіцієнт потужності",unit:"",color:"#26c6da",min:0,max:100}
 ];
 
 const MAX_POINTS = 20;
 let categories = [];
 const charts = {};
 const dataStore = {};
-
 const container = document.getElementById("dashboard");
 
-cardsData.forEach((c,i)=>{
+cardsData.forEach(c=>{
   dataStore[c.key] = [];
 
-  const card = document.createElement("div");
-  card.className="card";
-  card.innerHTML=`
-    <div class="title">${c.title}</div>
-    <div class="value-row">
-      <div class="value" style="color:${c.color}" id="value-${c.key}">0</div>
-      <div class="unit">${c.unit}</div>
+  container.insertAdjacentHTML("beforeend",`
+    <div class="card">
+      <div class="title">${c.title}</div>
+      <div class="value-row">
+        <div class="value" id="value-${c.key}" style="color:${c.color}">0</div>
+        <div class="unit">${c.unit}</div>
+      </div>
+      <div class="chart" id="chart-${c.key}"></div>
     </div>
-    <div class="chart" id="chart-${c.key}"></div>
-  `;
-  container.appendChild(card);
+  `);
 
   charts[c.key] = new ApexCharts(
-    document.querySelector(`#chart-${c.key}`),
+    document.getElementById(`chart-${c.key}`),
     {
       chart:{type:"area",height:90,sparkline:{enabled:true}},
       series:[{data:[]}],
       colors:[c.color],
       stroke:{curve:"smooth",width:2},
-      fill:{type:"gradient",gradient:{opacityFrom:0.45,opacityTo:0.05}},
+      fill:{type:"gradient",gradient:{opacityFrom:.45,opacityTo:.05}},
+      yaxis:{min:c.min,max:c.max},
       xaxis:{categories:[]},
       tooltip:{
-        enabled:true,
         theme:"dark",
         x:{show:false},
-        custom:({series,seriesIndex,dataPointIndex,w})=>{
-          const time = w.globals.categoryLabels[dataPointIndex];
-          const val = Number(series[0][dataPointIndex]).toFixed(2);
-          return `
-            <div style="padding:6px 10px;font-size:12px;color:#fff">
-              ${time}<br>
-              ${c.title}: ${val} ${c.unit}
-            </div>`;
-        }
+        custom:({series,dataPointIndex,w})=>`
+          <div style="padding:6px 10px;font-size:12px">
+            ${w.globals.categoryLabels[dataPointIndex]}<br>
+            ${c.title}: ${parseInt(series[0][dataPointIndex])} ${c.unit}
+          </div>`
       }
     }
   );
@@ -118,28 +110,23 @@ cardsData.forEach((c,i)=>{
 function updateDashboard(data){
   const now = new Date().toLocaleTimeString("uk-UA");
 
-  if(categories.length >= MAX_POINTS) categories.shift();
+  if(categories.length === MAX_POINTS) categories.shift();
   categories.push(now);
 
   cardsData.forEach(c=>{
-    if(dataStore[c.key].length >= MAX_POINTS)
-      dataStore[c.key].shift();
-
-    dataStore[c.key].push(data[c.key]);
-
-    document.getElementById(`value-${c.key}`).textContent =
-      Number(data[c.key]).toFixed(2);
-
-    charts[c.key].updateSeries([{data:[...dataStore[c.key]]}]);
-    charts[c.key].updateOptions({xaxis:{categories:[...categories]}});
+    if(dataStore[c.key].length === MAX_POINTS) dataStore[c.key].shift();
+    const value = parseInt(data[c.key]);
+    dataStore[c.key].push(value);
+    document.getElementById(`value-${c.key}`).textContent = value;
+    charts[c.key].updateSeries([{data:dataStore[c.key]}]);
+    charts[c.key].updateOptions({xaxis:{categories}});
   });
 }
 
 setInterval(async ()=>{
   const r = await fetch("/api/latest");
-  const d = await r.json();
-  updateDashboard(d);
-},15000);
+  updateDashboard(await r.json());
+},10000);
 </script>
 
 </body>
