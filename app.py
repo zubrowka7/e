@@ -25,6 +25,3 @@ def receive_data():
 @app.route("/api/latest")
 def latest():
     return jsonify(latest_data)
-
-if __name__ == "__main__":
-    app.run()
