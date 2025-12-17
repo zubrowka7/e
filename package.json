@@ -5,5 +5,12 @@
   "scripts": {
     "start": "bun run app.js"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
 }
